@@ -352,3 +352,29 @@ def test_retrieval_generic_exception_mapping(monkeypatch):
     res = _run(inspect.unwrap(module.retrieval)("tenant-1"))
     assert res["code"] == module.RetCode.SERVER_ERROR, res
     assert "boom" in res["message"], res
+
+
+@pytest.mark.p2
+def test_retrieval_argument_error_messages(monkeypatch):
+    """Guard: distinguish malformed vs missing argument errors."""
+    module = _load_dify_retrieval_module(monkeypatch)
+
+    # Case 1: malformed numeric options in retrieval_setting
+    _set_request_json(
+        monkeypatch,
+        module,
+        {
+            "knowledge_id": "kb-1",
+            "query": "hello",
+            "retrieval_setting": {"top_k": "not-int", "score_threshold": "not-float"},
+        },
+    )
+    res = _run(inspect.unwrap(module.retrieval)("tenant-1"))
+    assert res["code"] == module.RetCode.ARGUMENT_ERROR, res
+    assert "invalid or malformed arguments:" in res["message"], res
+
+    # Case 2: missing required fields (knowledge_id, query)
+    _set_request_json(monkeypatch, module, {})
+    res_missing = _run(inspect.unwrap(module.retrieval)("tenant-1"))
+    assert res_missing["code"] == module.RetCode.ARGUMENT_ERROR, res_missing
+    assert "required arguments are missing:" in res_missing["message"], res_missing
